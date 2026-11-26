@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIBRASENSE — Predictive Vibration Intelligence</title>
+  <link rel="stylesheet" href="styles.css?v=3" />
+</head>
+<body data-tier="1">
+  <div class="app-shell">
+    <!-- Top Header & Connection Bar -->
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 12h3l2.5-7 4 14 3.5-10 2.5 5H22" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-heading">VIBRASENSE</h1>
+          <p class="brand-subtitle">Predictive Vibration Intelligence for Zero-Downtime Reliability</p>
+        </div>
+      </div>
+
+      <div class="topbar-controls">
+        <div class="port-meta" id="port-meta" title="Active serial connection info">
+          <span class="meta-dot" id="meta-dot"></span>
+          <span id="port-label">Disconnected</span>
+        </div>
+
+        <button type="button" class="btn btn-primary" id="btn-connect">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v6m0 8v6M4.93 4.93l4.24 4.24m5.66 5.66l4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m5.66-5.66l4.24-4.24"/>
+          </svg>
+          Connect COM Port (e.g., COM5)
+        </button>
+
+        <button type="button" class="btn btn-danger-outline" id="btn-disconnect" disabled>
+          Disconnect
+        </button>
+
+        <button type="button" class="btn btn-ghost" id="btn-demo" title="Simulate ESP32 serial stream for testing without hardware">
+          Simulate Stream
+        </button>
+
+        <button type="button" class="btn btn-ghost" id="btn-settings" aria-expanded="false" aria-controls="settings-drawer">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.82 1 1.48 1.05H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          Thresholds
+        </button>
+
+        <button type="button" class="btn btn-ghost" id="btn-reset-all" title="Reset graph, stats, escalation log, thresholds, and console">
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="1 4 1 10 7 10"></polyline>
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+          </svg>
+          Reset
+        </button>
+      </div>
+    </header>
+
+    <!-- Alert / Error Banner (e.g., COM5 locked or unsupported browser) -->
+    <div class="alert-banner hidden" id="alert-banner" role="alert">
+      <div class="alert-banner-content">
+        <svg class="alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        <div>
+          <strong id="alert-title">Serial Connection Error</strong>
+          <p id="alert-message"></p>
+        </div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm" id="btn-dismiss-alert" aria-label="Dismiss alert">Dismiss</button>
+    </div>
+
+    <!-- Collapsible Thresholds & Settings Drawer -->
+    <section class="settings-drawer hidden" id="settings-drawer" aria-label="Service Tier Threshold Settings">
+      <div class="panel-header">
+        <div>
+          <h2>Urgency Engine Threshold Configuration</h2>
+          <p class="panel-subtitle">Customize vibration severity boundaries (m/s²). Changes apply immediately to live telemetry.</p>
+        </div>
+      </div>
+
+      <div class="settings-grid">
+        <div class="setting-item">
+          <div class="setting-label-row">
+            <label for="slider-tier2">Tier 2 Min — Minor Wear (Yellow / Amber)</label>
+            <span class="setting-value mono" id="val-tier2">0.50 m/s²</span>
+          </div>
+          <input type="range" id="slider-tier2" min="0.10" max="2.00" step="0.05" value="0.50" />
+          <p class="setting-hint">Tier 1 Optimal is 0.00 to &lt; <span id="hint-tier2">0.50</span> m/s²</p>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-label-row">
+            <label for="slider-tier3">Tier 3 Min — Moderate Degradation (Orange)</label>
+            <span class="setting-value mono" id="val-tier3">1.50 m/s²</span>
+          </div>
+          <input type="range" id="slider-tier3" min="0.40" max="4.00" step="0.05" value="1.50" />
+          <p class="setting-hint">Also triggered when Last 5 anomalies = 2</p>
+        </div>
+
+        <div class="setting-item">
+          <div class="setting-label-row">
+            <label for="slider-tier4">Tier 4 Min — Critical Fault (Red)</label>
+            <span class="setting-value mono" id="val-tier4">3.00 m/s²</span>
+          </div>
+          <input type="range" id="slider-tier4" min="1.00" max="8.00" step="0.05" value="3.00" />
+          <p class="setting-hint">Also triggered when Last 5 anomalies &ge; 3 or Buzzer: ACTIVE</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Hero Service Urgency Card -->
+    <section class="hero-card tier-1" id="hero-card" aria-live="polite">
+      <div class="hero-main">
+        <div class="hero-badges">
+          <span class="tier-pill" id="hero-tier-badge">TIER 1 // OPTIMAL CONDITION</span>
+          <span class="timeline-pill" id="hero-timeline">Timeline: No Service Needed</span>
+          <span class="trigger-pill" id="hero-trigger">Awaiting telemetry...</span>
+        </div>
+
+        <h2 class="hero-status" id="hero-status">OPTIMAL PERFORMANCE — No service needed</h2>
+        <p class="hero-action" id="hero-action">Normal operation; equipment running within baseline tolerances.</p>
+      </div>
+
+      <div class="hero-metrics">
+        <div class="hero-metric-box">
+          <span class="metric-caption">LIVE MAX DEVIATION</span>
+          <div class="metric-big mono">
+            <span id="hero-max-dev">0.00</span>
+            <span class="metric-unit">m/s²</span>
+          </div>
+          <span class="metric-sub mono" id="hero-last-update">Last packet: --</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Severity Gauge & Threshold Zones -->
+    <section class="panel gauge-panel">
+      <div class="panel-header">
+        <div>
+          <h2>Severity Gauge &amp; Threshold Zones</h2>
+          <p class="panel-subtitle">Live vibration peak position across the 4 maintenance urgency bands</p>
+        </div>
+        <div class="gauge-readout mono">
+          Current: <strong id="gauge-current-val">0.00 m/s²</strong>
+          <span class="divider">|</span>
+          Scale Max: <strong id="gauge-scale-max">4.50 m/s²</strong>
+        </div>
+      </div>
+
+      <div class="gauge-wrapper">
+        <div class="gauge-track" id="gauge-track">
+          <div class="gauge-zone zone-1" id="zone-1">
+            <span class="zone-name">Optimal</span>
+          </div>
+          <div class="gauge-zone zone-2" id="zone-2">
+            <span class="zone-name">Service Rec.</span>
+          </div>
+          <div class="gauge-zone zone-3" id="zone-3">
+            <span class="zone-name">Within 30 Days</span>
+          </div>
+          <div class="gauge-zone zone-4" id="zone-4">
+            <span class="zone-name">Immediate</span>
+          </div>
+          <div class="gauge-needle" id="gauge-needle" style="left: 0%;">
+            <div class="needle-head"></div>
+            <div class="needle-stem"></div>
+          </div>
+        </div>
+
+        <div class="gauge-ticks mono" id="gauge-ticks">
+          <span class="tick" style="left: 0%;">0.00</span>
+          <span class="tick" id="tick-t2">0.50</span>
+          <span class="tick" id="tick-t3">1.50</span>
+          <span class="tick" id="tick-t4">3.00</span>
+          <span class="tick tick-end" id="tick-max">4.50+</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Telemetry Grid: Chart + Hardware Mirror -->
+    <div class="dashboard-grid">
+      <!-- Real-Time Telemetry Chart -->
+      <section class="panel chart-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Live Vibration Telemetry</h2>
+            <p class="panel-subtitle">Scrolling Max dev (m/s²) with dynamic service urgency threshold bands</p>
+          </div>
+          <div class="chart-legend">
+            <span class="legend-item"><i class="dot dot-t1"></i>Optimal</span>
+            <span class="legend-item"><i class="dot dot-t2"></i>Minor Wear</span>
+            <span class="legend-item"><i class="dot dot-t3"></i>30-Day Service</span>
+            <span class="legend-item"><i class="dot dot-t4"></i>Critical</span>
+          </div>
+        </div>
+        <div class="chart-container">
+          <canvas id="telemetry-chart"></canvas>
+          <div class="chart-tooltip hidden mono" id="chart-tooltip"></div>
+        </div>
+      </section>
+
+      <!-- Sliding Window & Hardware Mirror -->
+      <section class="panel hardware-panel">
+        <div class="panel-header">
+          <div>
+            <h2>Sliding Window &amp; Hardware Mirror</h2>
+            <p class="panel-subtitle">ESP32 edge state, anomaly count, and session peaks</p>
+          </div>
+        </div>
+
+        <div class="anomaly-block-card">
+          <div class="anomaly-header">
+            <span class="card-label">LAST 5 ANOMALIES (SLIDING WINDOW)</span>
+            <span class="anomaly-fraction mono" id="anomaly-fraction">0 / 5</span>
+          </div>
+          <div class="anomaly-slots" id="anomaly-slots" aria-label="Last 5 anomalies indicator">
+            <div class="anomaly-slot" data-index="0">1</div>
+            <div class="anomaly-slot" data-index="1">2</div>
+            <div class="anomaly-slot" data-index="2">3</div>
+            <div class="anomaly-slot" data-index="3">4</div>
+            <div class="anomaly-slot" data-index="4">5</div>
+          </div>
+          <p class="anomaly-rule-note" id="anomaly-rule-note">0–1: Normal | 2: Tier 3 (30 Days) | 3+: Tier 4 (Immediate)</p>
+        </div>
+
+        <div class="hardware-grid">
+          <div class="hw-card">
+            <span class="card-label">WINDOW STATUS</span>
+            <div class="hw-value">
+              <span class="status-badge status-neutral" id="badge-window">--</span>
+            </div>
+          </div>
+
+          <div class="hw-card">
+            <span class="card-label">HARDWARE LED</span>
+            <div class="hw-value">
+              <span class="hw-indicator" id="led-indicator">
+                <span class="indicator-lamp"></span>
+                <span class="mono" id="badge-led">OFF</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="hw-card">
+            <span class="card-label">HARDWARE BUZZER</span>
+            <div class="hw-value">
+              <span class="hw-indicator" id="buzzer-indicator">
+                <span class="indicator-lamp"></span>
+                <span class="mono" id="badge-buzzer">OFF</span>
+              </span>
+            </div>
+          </div>
+
+          <div class="hw-card">
+            <span class="card-label">SESSION PEAK DEV</span>
+            <div class="hw-value mono">
+              <span class="peak-val" id="stat-peak-dev">0.00</span>
+              <span class="peak-unit">m/s²</span>
+            </div>
+          </div>
+
+          <div class="hw-card hw-card-wide">
+            <div class="hw-wide-row">
+              <div>
+                <span class="card-label">WORST URGENCY TIER REACHED</span>
+                <div class="worst-tier-row">
+                  <span class="tier-pill tier-1" id="badge-worst-tier">Tier 1 — Optimal</span>
+                </div>
+              </div>
+              <div class="packets-counter mono">
+                <span class="card-label">PACKETS PARSED</span>
+                <strong id="stat-packets">0</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Maintenance Escalation Log & CSV Export -->
+    <section class="panel log-panel">
+      <div class="panel-header">
+        <div>
+          <h2>Maintenance Escalation Log</h2>
+          <p class="panel-subtitle">Records every escalation to a higher service urgency tier during the monitoring session</p>
+        </div>
+        <div class="panel-actions">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-export-csv" disabled>
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Export Maintenance Report (CSV)
+          </button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="log-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Transition</th>
+              <th>Urgency Status</th>
+              <th>Max Dev</th>
+              <th>Anomalies</th>
+              <th>Hardware (LED / Buzzer)</th>
+              <th>Trigger &amp; Recommended Action</th>
+            </tr>
+          </thead>
+          <tbody id="log-tbody">
+            <tr class="empty-row">
+              <td colspan="7">No tier escalations recorded yet. Connect COM5 or run simulation to begin monitoring.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Expandable Raw Serial Console -->
+    <section class="panel console-panel" id="console-panel">
+      <div class="console-header">
+        <button type="button" class="console-toggle" id="btn-toggle-console" aria-expanded="false" aria-controls="console-body">
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+          <span>Raw Serial Console (115200 8N1)</span>
+          <span class="badge badge-neutral mono" id="console-line-count">0 lines</span>
+        </button>
+
+        <div class="console-actions">
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-pause-scroll" aria-pressed="false">
+            Pause Auto-Scroll
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" id="btn-clear-console">
+            Clear
+          </button>
+        </div>
+      </div>
+
+      <div class="console-body hidden" id="console-body">
+        <div class="console-output mono" id="console-output" role="log" aria-live="off">
+          <div class="console-placeholder">Waiting for incoming serial stream...</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js?v=3"></script>
+</body>
+</html>
